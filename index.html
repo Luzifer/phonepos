@@ -1,0 +1,144 @@
+<html>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.5.1/dist/leaflet.min.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Get your position</title>
+
+  <style>
+    #mapid {
+      padding-top: 56.25%;
+      width: 100%;
+    }
+  </style>
+
+  <div id="app">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col">
+
+          <div class="card my-3">
+            <div class="card-header">Get your current position...</div>
+            <div class="card-body">
+
+              <div class="row" v-if="coord.latitude">
+                <div class="col">
+                  <div class="form-group">
+                    <label for="latitude">Latitude</label>
+                    <input type="text" disabled id="latitude" class="form-control" :value="coord.latitude.toFixed(6)" />
+                  </div>
+                </div>
+
+                <div class="col">
+                  <div class="form-group">
+                    <label for="longitude">Longitude</label>
+                    <input type="text" disabled id="longitude" class="form-control" :value="coord.longitude.toFixed(6)" />
+                  </div>
+                </div>
+
+                <div class="col">
+                  <div class="form-group">
+                    <label for="accuracy">Accuracy (m)</label>
+                    <input type="text" disabled id="accuracy" class="form-control" :value="coord.accuracy.toFixed(2)" />
+                  </div>
+                </div>
+              </div>
+
+              <p class="mb-0">
+                <button class="btn btn-secondary" @click="getLocation">Get location once...</button>
+                <button class="btn btn-primary" @click="followLocation(true)" v-if="!follow">Improve location...</button>
+                <button class="btn btn-danger" @click="followLocation(false)" v-else>Stop improving location...</button>
+              </p>
+
+            </div>
+            <div class="card-footer text-muted">{{ message }}</div>
+          </div>
+
+          <div class="card" v-if="coord.latitude">
+            <div id="mapid" class="card-img"></div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/combine/npm/vue@2.6.10,npm/jquery@3.4.1,npm/bootstrap@4.3.1/dist/js/bootstrap.min.js,npm/leaflet@1.5.1/dist/leaflet.min.js"></script>
+
+  <script>
+    (() => {
+      window.vue = new Vue({
+        data: {
+          coord: {},
+          follow: false,
+          map: null,
+          marker: null,
+          message: 'Click button to start...',
+          options: {
+            enableHighAccuracy: true,
+            timeout: 30000,
+            maximumAge: 0,
+          },
+          watch: null,
+        },
+        el: '#app',
+
+        methods: {
+          error(err) {
+            this.message = `ERROR(${err.code}): ${err.message}`
+          },
+
+          followLocation(follow) {
+            if (this.watch) {
+              navigator.geolocation.clearWatch(this.watch)
+            }
+
+            this.follow = follow
+
+            if (follow) {
+              this.coord.accuracy = 10000
+              this.watch = navigator.geolocation.watchPosition(this.narrow, this.error, this.options)
+            }
+          },
+
+          getLocation() {
+            navigator.geolocation.getCurrentPosition(this.success, this.error, this.options);
+            this.message = 'Location query started...'
+          },
+
+          narrow(pos) {
+            if (this.coord.latitude && pos.coords.accuracy >= this.coord.accuracy) {
+              // More inaccurate, drop result
+              this.message = "Received result, too inaccurate..."
+              return
+            }
+
+            this.success(pos)
+          },
+
+          success(pos) {
+            this.coord = pos.coords
+            this.message = 'Location query succeeded.'
+
+            window.setTimeout(() => {
+              if (!this.map) {
+                this.map = L.map('mapid').setView([this.coord.latitude, this.coord.longitude], 15)
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                  attribution: 'Map data © <a href="https://openstreetmap.org">OpenStreetMap</a> contributors',
+                  maxZoom: 18,
+                  minZoom: 8,
+                }).addTo(this.map)
+                this.marker = L.marker([this.coord.latitude, this.coord.longitude]).addTo(this.map)
+              } else {
+                this.map.setView([this.coord.latitude, this.coord.longitude], 15)
+                this.marker.setLatLng([this.coord.latitude, this.coord.longitude])
+              }
+            }, 200)
+          },
+        },
+      })
+    })()
+  </script>
+
+</html>
